@@ -1,6 +1,7 @@
 import { Platform, Linking } from 'react-native';
 import React from 'react';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import appleAuth from '@invertase/react-native-apple-authentication';
 import { SocialLoginOptions, SocialLoginResult } from '../types';
 import { API_BASE_URL } from '../constants';
 
@@ -269,8 +270,9 @@ export const signInWithFacebook = async () => {
 };
 
 // Apple Sign In (iOS only)
-// Note: Apple Sign-In requires @invertase/react-native-apple-authentication or similar
-// This is a placeholder implementation
+// Uses @invertase/react-native-apple-authentication. The native flow returns an
+// identityToken (a signed JWT) which is forwarded to the backend at
+// POST /auth/apple/mobile for verification against Apple's public keys.
 export const signInWithApple = async () => {
   if (Platform.OS !== 'ios') {
     return {
@@ -279,10 +281,94 @@ export const signInWithApple = async () => {
     };
   }
 
-  return {
-    success: false,
-    error: 'Apple Sign-In is not yet implemented for React Native CLI. Please use Google Sign-In instead.',
-  };
+  if (!appleAuth.isSupported) {
+    return {
+      success: false,
+      error: 'Apple Sign-In requires iOS 13 or later',
+    };
+  }
+
+  try {
+    // Trigger the native Apple authentication sheet.
+    const credential = await appleAuth.performRequest({
+      requestedOperation: appleAuth.Operation.LOGIN,
+      requestedScopes: [appleAuth.Scope.EMAIL, appleAuth.Scope.FULL_NAME],
+    });
+
+    // Confirm the credential is authorized for this user.
+    const credentialState = await appleAuth.getCredentialStateForUser(
+      credential.user,
+    );
+    if (credentialState !== appleAuth.State.AUTHORIZED) {
+      return { success: false, error: 'Apple authorization was not granted' };
+    }
+
+    const { identityToken, authorizationCode, fullName, email } = credential;
+    if (!identityToken) {
+      return { success: false, error: 'Failed to get Apple identity token' };
+    }
+
+    // Apple returns name/email only on the FIRST authorization, so forward
+    // whatever is present this time (backend should persist it on first login).
+    const displayName = fullName
+      ? [fullName.givenName, fullName.familyName].filter(Boolean).join(' ').trim()
+      : undefined;
+
+    // Send the identityToken to the backend for verification + our own JWT.
+    const backendResponse = await fetch(`${API_BASE_URL}/auth/apple/mobile`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      },
+      body: JSON.stringify({
+        identityToken,
+        authorizationCode,
+        email: email || undefined,
+        name: displayName || undefined,
+      }),
+    });
+
+    const responseText = await backendResponse.text();
+    let backendData;
+    try {
+      backendData = JSON.parse(responseText);
+    } catch (parseError) {
+      return { success: false, error: 'Invalid response from server' };
+    }
+
+    if (!backendResponse.ok || backendData.status !== 'success') {
+      return {
+        success: false,
+        error: backendData.message || 'Backend authentication failed',
+      };
+    }
+
+    const { user, token, refreshToken } = backendData.data;
+
+    return {
+      success: true,
+      data: {
+        token: token,
+        refreshToken: refreshToken,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.user_id || user.name,
+          phone: user.phone,
+          avatar: user.avatar,
+        },
+      },
+    };
+  } catch (err: any) {
+    if (err?.code === appleAuth.Error.CANCELED) {
+      return { success: false, error: 'Sign-in cancelled' };
+    }
+    return {
+      success: false,
+      error: err?.message || 'Apple sign-in failed',
+    };
+  }
 };
 
 // Social login hook (similar to useMutation pattern)
