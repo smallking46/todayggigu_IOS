@@ -3638,7 +3638,7 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
       </View>
     );
     return(
-    <View style={[styles.bottomBar, { paddingBottom: responsive.isTablet ? SPACING.lg + insets.bottom : Math.max(insets.bottom - SPACING.md, SPACING.xs) }]}>
+    <View style={[styles.bottomBar, { paddingBottom: responsive.isTablet ? SPACING.lg + insets.bottom : Math.max(insets.bottom - SPACING.lg, 0) }]}>
       {/* 아이폰: 수량/재고를 맨 윗줄에 단독 배치 (아래 아이콘/버튼 줄과 분리) */}
       {!responsive.isTablet && (
         <View style={styles.phoneQuantityRow}>
