@@ -3538,9 +3538,114 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
     const companyName = (product as any).metadata?.original1688Data?.companyName || 
                         product.seller?.name || 
                         'Store';
+    // 수량+재고 / 액션버튼을 각각 한 번만 정의해 폰(2줄)·태블릿(1줄) 양쪽에서 재사용.
+    const quantityStockBlock = (
+      <View style={styles.quantityWithStock}>
+        <View style={styles.quantitySelector}>
+          <TouchableOpacity
+            style={styles.quantityButton}
+            onPress={() => handleQuantityChange(false)}
+          >
+            <MinusIcon width={18} height={18} color={COLORS.text.primary} />
+          </TouchableOpacity>
+          <TextInput
+            style={styles.quantityText}
+            value={String(quantity)}
+            onChangeText={handleQuantityInput}
+            onBlur={handleQuantityBlur}
+            keyboardType="number-pad"
+            returnKeyType="done"
+            selectTextOnFocus
+            maxLength={7}
+          />
+          <TouchableOpacity
+            style={styles.quantityButton}
+            onPress={() => handleQuantityChange(true)}
+          >
+            <PlusIcon width={18} height={18} color={COLORS.text.primary} />
+          </TouchableOpacity>
+        </View>
+        {displayStock != null && (
+          <Text style={styles.quantityStockText}>
+            {locale === 'ko' ? `재고 ${displayStock.toLocaleString()}`
+              : locale === 'zh' ? `库存 ${displayStock.toLocaleString()}`
+              : `Stock ${displayStock.toLocaleString()}`}
+          </Text>
+        )}
+      </View>
+    );
+    const actionButtonsBlock = (
+      <View style={[styles.actionButtonsGroup, responsive.isTablet ? styles.actionButtonsGroupTablet : styles.actionButtonsGroupPhone]}>
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            styles.addToCartButton,
+            !canAddToCart && styles.disabledButton,
+          ]}
+          disabled={isAddingToCart}
+          onPress={() => {
+            handleAddToCart();
+          }}
+        >
+          {isAddingToCart ? (
+            <View style={styles.actionButtonContent}>
+              <ActivityIndicator size="small" color={COLORS.black} />
+              <Text style={styles.addToCartText}>{t('product.addingToCart')}</Text>
+            </View>
+          ) : (
+            <Text style={styles.addToCartText} numberOfLines={1}>
+              {t('product.addToCart')}
+            </Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            styles.buyNowButton,
+            !canAddToCart && styles.disabledButton,
+          ]}
+          disabled={!canAddToCart}
+          onPress={() => {
+            if (!isAuthenticated) {
+              navigation.navigate('Auth', {
+                screen: 'Login',
+                params: {
+                  returnTo: 'ProductDetail',
+                  returnParams: {
+                    productId: productId || offerId,
+                    offerId: offerId,
+                    productData: product,
+                  },
+                },
+              } as never);
+              return;
+            }
+
+            handleBuyNow();
+          }}
+        >
+          {isBuyingNow ? (
+            <View style={styles.actionButtonContent}>
+              <ActivityIndicator size="small" color={COLORS.white} />
+              <Text style={styles.buyNowText}>{t('product.buyNow')}</Text>
+            </View>
+          ) : (
+            <Text style={styles.buyNowText} numberOfLines={1}>
+              {t('product.buyNow')}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    );
     return(
     <View style={[styles.bottomBar, { paddingBottom: SPACING.lg + insets.bottom }]}>
-      {/* Action row: side icons (left) + quantity/stock + action buttons (right) */}
+      {/* 아이폰: 수량/재고를 맨 윗줄에 단독 배치 (아래 아이콘/버튼 줄과 분리) */}
+      {!responsive.isTablet && (
+        <View style={styles.phoneQuantityRow}>
+          {quantityStockBlock}
+        </View>
+      )}
+      {/* 아이콘(좌) + (폰)담기/구매 / (태블릿)수량+버튼 */}
       <View style={styles.mainActionRow}>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: SPACING.sm}}>
           <TouchableOpacity 
@@ -3592,105 +3697,16 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({
             />
           </TouchableOpacity>
         </View>
-        <View style={styles.bottomRightGroup}>
-          {/* 수량 + 재고 — 장바구니 담기 버튼 바로 왼쪽에 배치 */}
-          <View style={styles.quantityWithStock}>
-            <View style={styles.quantitySelector}>
-              <TouchableOpacity
-                style={styles.quantityButton}
-                onPress={() => handleQuantityChange(false)}
-              >
-                <MinusIcon width={18} height={18} color={COLORS.text.primary} />
-              </TouchableOpacity>
-              <TextInput
-                style={styles.quantityText}
-                value={String(quantity)}
-                onChangeText={handleQuantityInput}
-                onBlur={handleQuantityBlur}
-                keyboardType="number-pad"
-                returnKeyType="done"
-                selectTextOnFocus
-                maxLength={7}
-              />
-              <TouchableOpacity
-                style={styles.quantityButton}
-                onPress={() => handleQuantityChange(true)}
-              >
-                <PlusIcon width={18} height={18} color={COLORS.text.primary} />
-              </TouchableOpacity>
-            </View>
-            {/* 옵션 선택 시 해당 SKU 재고, 아니면 product 전체 stockCount. 999999 sentinel 은 숨김. */}
-            {displayStock != null && (
-              <Text style={styles.quantityStockText}>
-                {locale === 'ko' ? `재고 ${displayStock.toLocaleString()}`
-                  : locale === 'zh' ? `库存 ${displayStock.toLocaleString()}`
-                  : `Stock ${displayStock.toLocaleString()}`}
-              </Text>
-            )}
+        {responsive.isTablet ? (
+          /* 태블릿: 수량/재고 + 버튼을 한 줄(버튼 바로 왼쪽에 수량/재고) */
+          <View style={styles.bottomRightGroup}>
+            {quantityStockBlock}
+            {actionButtonsBlock}
           </View>
-          <View style={[styles.actionButtonsGroup, responsive.isTablet && styles.actionButtonsGroupTablet]}>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              styles.addToCartButton,
-              !canAddToCart && styles.disabledButton,
-            ]}
-            disabled={isAddingToCart}
-            onPress={() => {
-              handleAddToCart();
-            }}
-          >
-            {isAddingToCart ? (
-              <View style={styles.actionButtonContent}>
-                <ActivityIndicator size="small" color={COLORS.black} />
-                <Text style={styles.addToCartText}>{t('product.addingToCart')}</Text>
-              </View>
-            ) : (
-              <Text style={styles.addToCartText} numberOfLines={1}>
-                {t('product.addToCart')}
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              styles.buyNowButton,
-              !canAddToCart && styles.disabledButton,
-            ]}
-            disabled={!canAddToCart}
-            onPress={() => {
-              if (!isAuthenticated) {
-                navigation.navigate('Auth', {
-                  screen: 'Login',
-                  params: {
-                    returnTo: 'ProductDetail',
-                    returnParams: {
-                      productId: productId || offerId,
-                      offerId: offerId,
-                      productData: product,
-                    },
-                  },
-                } as never);
-                return;
-              }
-
-              handleBuyNow();
-            }}
-          >
-            {isBuyingNow ? (
-              <View style={styles.actionButtonContent}>
-                <ActivityIndicator size="small" color={COLORS.white} />
-                <Text style={styles.buyNowText}>{t('product.buyNow')}</Text>
-              </View>
-            ) : (
-              <Text style={styles.buyNowText} numberOfLines={1}>
-                {t('product.buyNow')}
-              </Text>
-            )}
-          </TouchableOpacity>
-          </View>
-        </View>
+        ) : (
+          /* 아이폰: 이 줄(아이콘 옆)엔 담기/구매 버튼. 수량/재고는 윗줄로 분리됨 */
+          actionButtonsBlock
+        )}
       </View>
     </View>
   );}
@@ -4853,6 +4869,16 @@ const styles = StyleSheet.create({
   // 태블릿: 장바구니/바로구매 버튼 그룹의 길이를 360px 이하로 제한.
   actionButtonsGroupTablet: {
     maxWidth: 360,
+  },
+  // 아이폰: 버튼 그룹을 아랫줄에서 전체너비로 (왼쪽 여백 제거).
+  actionButtonsGroupPhone: {
+    marginLeft: 0,
+  },
+  // 아이폰: 수량/재고 전용 윗줄 (오른쪽 정렬 — 아래 담기/구매 버튼 위에 위치).
+  phoneQuantityRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: SPACING.sm,
   },
   actionButton: {
     flex: 1,
