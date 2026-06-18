@@ -591,7 +591,8 @@ const BuyListScreen: React.FC<BuyListScreenProps> = ({
     | 'refund_management'
     | 'shipment_hold'
     | 'problem_product';
-  type BusinessDomain = BuyListBusinessDomain;
+  // 'all' = 도메인 필터 없음(전체주문건). 최상단 '전체' 칩이 사용.
+  type BusinessDomain = BuyListBusinessDomain | 'all';
   const routeDomain = (embedded ? embeddedDomain : route.params?.domain) as
     | BusinessDomain
     | 'error_management'
@@ -2532,10 +2533,16 @@ const BuyListScreen: React.FC<BuyListScreenProps> = ({
         <View style={styles.filterRow1}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow1Content}>
             <TouchableOpacity
-              style={[styles.filterChip, activeTab === 'all' && styles.filterChipActive]}
-              onPress={() => { setActiveTab('all'); setSelectedProgressStatus(null); }}
+              style={[styles.filterChip, activeBusinessDomain === 'all' && styles.filterChipActive]}
+              onPress={() => {
+                // 전체 = 도메인 필터 없음 + 상태 필터 없음 → 전체주문건 표시.
+                setActiveBusinessDomain('all');
+                setActiveTab('all');
+                setSelectedProgressStatus(null);
+                setExpandedStatusGroup(null);
+              }}
             >
-              <Text style={[styles.filterChipText, activeTab === 'all' && styles.filterChipTextActive]}>
+              <Text style={[styles.filterChipText, activeBusinessDomain === 'all' && styles.filterChipTextActive]}>
                 {t('profile.viewAll') || 'All'}
               </Text>
             </TouchableOpacity>
